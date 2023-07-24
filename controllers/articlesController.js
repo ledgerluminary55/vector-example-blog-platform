@@ -1,17 +1,22 @@
-const Article = require('../models/Article');
-const User = require('../models/User');
 const asyncHandler = require('express-async-handler');
+const {getModel} = require('ottoman');
+const User = getModel('User');
+const Article = getModel('Article');
+const  {Logger} = require('../config/logger');
+const log = Logger.child({
+    namespace: 'articlesController',
+});
 
 const createArticle = asyncHandler(async (req, res) => {
     const id = req.userId;
 
-    const author = await User.findById(id).exec();
+    const author = await User.findById(id).catch(e => {log.debug(e, "User not found"); return res.status(401).json({message: "User not found"}); });
 
     const { title, description, body, tagList } = req.body.article;
 
     // confirm data
     if (!title || !description || !body) {
-        res.status(400).json({message: "All fields are required"});
+        return res.status(400).json({message: "All fields are required"});
     }
 
     const article = await Article.create({ title, description, body });
@@ -19,12 +24,15 @@ const createArticle = asyncHandler(async (req, res) => {
     article.author = id;
 
     if (Array.isArray(tagList) && tagList.length > 0) {
-        article.tagList = tagList;
+        const localeSort = Array.from(tagList).sort((a, b) => {
+            return a.localeCompare(b);
+          });
+        article.tagList = localeSort;
     }
 
     await article.save()
 
-    return await res.status(200).json({
+    return res.status(200).json({
         article: await article.toArticleResponse(author)
     })
 
@@ -37,7 +45,7 @@ const deleteArticle = asyncHandler(async (req, res) => {
 
     // console.log(id);
 
-    const loginUser = await User.findById(id).exec();
+    const loginUser = await User.findById(id).catch(e => log.debug(e, "User not found"));
 
     if (!loginUser) {
         return res.status(401).json({
@@ -45,7 +53,7 @@ const deleteArticle = asyncHandler(async (req, res) => {
         });
     }
 
-    const article = await Article.findOne({slug}).exec();
+    const article = await Article.findOne({slug}).catch(e => log.debug(e, "Article not found"));
 
     if (!article) {
         return res.status(401).json({
@@ -55,8 +63,8 @@ const deleteArticle = asyncHandler(async (req, res) => {
     // console.log(`article author is ${article.author}`)
     // console.log(`login user id is ${loginUser}`)
 
-    if (article.author.toString() === loginUser._id.toString()) {
-        await Article.deleteOne({slug: slug});
+    if (article.author.toString() === loginUser.id.toString()) {
+        await Article.removeById(article.id);
         res.status(200).json({
             message: "Article successfully deleted!!!"
         })
@@ -73,7 +81,7 @@ const favoriteArticle = asyncHandler(async (req, res) => {
 
     const { slug } = req.params;
 
-    const loginUser = await User.findById(id).exec();
+    const loginUser = await User.findById(id).catch(e => log.debug(e, "User not found"));
 
     if (!loginUser) {
         return res.status(401).json({
@@ -81,7 +89,7 @@ const favoriteArticle = asyncHandler(async (req, res) => {
         });
     }
 
-    const article = await Article.findOne({slug}).exec();
+    const article = await Article.findOne({slug}).catch(e => log.debug(e, "Article not found"));
 
     if (!article) {
         return res.status(401).json({
@@ -90,9 +98,7 @@ const favoriteArticle = asyncHandler(async (req, res) => {
     }
     // console.log(`article info ${article}`);
 
-    await loginUser.favorite(article._id);
-
-    const updatedArticle = await article.updateFavoriteCount();
+    const updatedArticle = await loginUser.favorite(article.id);
 
     return res.status(200).json({
         article: await updatedArticle.toArticleResponse(loginUser)
@@ -104,7 +110,7 @@ const unfavoriteArticle = asyncHandler(async (req, res) => {
 
     const { slug } = req.params;
 
-    const loginUser = await User.findById(id).exec();
+    const loginUser = await User.findById(id).catch(e => log.debug(e, "User not found"));
 
     if (!loginUser) {
         return res.status(401).json({
@@ -112,7 +118,7 @@ const unfavoriteArticle = asyncHandler(async (req, res) => {
         });
     }
 
-    const article = await Article.findOne({slug}).exec();
+    const article = await Article.findOne({slug}).catch(e => log.debug(e, "Article not found"));
 
     if (!article) {
         return res.status(401).json({
@@ -120,19 +126,17 @@ const unfavoriteArticle = asyncHandler(async (req, res) => {
         });
     }
 
-    await loginUser.unfavorite(article._id);
-
-    await article.updateFavoriteCount();
+    const updatedArticle = await loginUser.unfavorite(article.id);
 
     return res.status(200).json({
-        article: await article.toArticleResponse(loginUser)
+        article: await updatedArticle.toArticleResponse(loginUser)
     });
 });
 
 const getArticleWithSlug = asyncHandler(async (req, res) => {
     const { slug } = req.params;
 
-    const article = await Article.findOne({slug}).exec();
+    const article = await Article.findOne({slug}).catch(e => log.debug(e, "Article not found"));
 
     if (!article) {
         return res.status(401).json({
@@ -152,9 +156,9 @@ const updateArticle = asyncHandler(async (req, res) => {
 
     const { slug } = req.params;
 
-    const loginUser = await User.findById(userId).exec();
+    const loginUser = await User.findById(userId);
 
-    const target = await Article.findOne({ slug }).exec();
+    const target = await Article.findOne({ slug });
 
     // console.log(target.title);
     // console.log(req.userId);
@@ -172,8 +176,9 @@ const updateArticle = asyncHandler(async (req, res) => {
     }
 
     await target.save();
+    const articleResponse = await target.toArticleResponse(loginUser)
     return res.status(200).json({
-        article: await target.toArticleResponse(loginUser)
+        article: articleResponse
     })
 });
 
@@ -191,24 +196,25 @@ const feedArticles = asyncHandler(async (req, res) => {
 
     const userId = req.userId;
 
-    const loginUser = await User.findById(userId).exec();
+    const loginUser = await User.findById(userId);
 
     // console.log(loginUser.followingUsers)
 
     // confirm data
 
-    const filteredArticles = await Article.find({author: {$in: loginUser.followingUsers}})
-        .limit(Number(limit))
-        .skip(Number(offset))
-        .exec();
+    const {rows : filteredArticles} = await Article.find({author: {$in:  loginUser.followingUsers}}, {
+        limit: Number(limit),
+         skip: Number(offset)
+    });
 
     // console.log(`articles: ${filteredArticles}`);
     const articleCount = await Article.count({author: {$in: loginUser.followingUsers}});
 
+    const fetchedArticles = await Promise.all(filteredArticles.map(async article => {
+        return await article.toArticleResponse(loginUser);
+    }));
     return res.status(200).json({
-        articles: await Promise.all(filteredArticles.map(async article => {
-            return await article.toArticleResponse(loginUser);
-        })),
+        articles: fetchedArticles,
         articlesCount: articleCount
     });
 });
@@ -225,43 +231,41 @@ const listArticles = asyncHandler(async (req, res) => {
         offset = req.query.offset;
     }
     if (req.query.tag) {
-        query.tagList = {$in: [req.query.tag]}
+        query[`"${req.query.tag}"`] = { $in: { $field: 'tagList' } }
+        // query.tagList = { $in: [req.query.tag] } // Works with
     }
 
     if (req.query.author) {
-        const author = await User.findOne({username: req.query.author}).exec();
+        const author = await User.findOne({username: req.query.author}).catch(e => log.debug(e, "User not Found"));
         if (author) {
-            query.author = author._id;
+            query.author = author.id;
         }
     }
 
     if (req.query.favorited) {
-        const favoriter = await User.findOne({username: req.query.favorited}).exec();
+        const favoriter = await User.findOne({username: req.query.favorited}).catch(e => log.debug(e, "User not Found"))
         if (favoriter) {
-            query._id = {$in: favoriter.favouriteArticles}
+            query.id = {$in: favoriter.favouriteArticles}
         }
     }
-
-    const filteredArticles = await Article.find(query)
-        .limit(Number(limit))
-        .skip(Number(offset))
-        .sort({createdAt: 'desc'}).exec()
-
+    const {rows : filteredArticles} = await Article.find(query,{limit: Number(limit), skip: Number(offset), sort: {createdAt: 'DESC'}  });
     const articleCount = await Article.count(query);
 
     if (req.loggedin) {
-        const loginUser = await User.findById(req.userId).exec();
+        const loginUser = await User.findById(req.userId);
+        const fetchedArticles = await Promise.all(filteredArticles.map(async article => {
+            return await article.toArticleResponse(loginUser);
+        }));
         return res.status(200).json({
-            articles: await Promise.all(filteredArticles.map(async article => {
-                return await article.toArticleResponse(loginUser);
-            })),
+            articles: fetchedArticles,
             articlesCount: articleCount
         });
     } else {
+        const fetchedArticles = await Promise.all(filteredArticles.map(async article => {
+            return await article.toArticleResponse(false);
+        }))
         return res.status(200).json({
-            articles: await Promise.all(filteredArticles.map(async article => {
-                return await article.toArticleResponse(false);
-            })),
+            articles: fetchedArticles,
             articlesCount: articleCount
         });
     }

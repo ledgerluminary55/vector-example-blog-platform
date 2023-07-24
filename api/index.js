@@ -6,11 +6,11 @@ const PORT = process.env.PORT || 4000;
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const corsOptions = require('../config/corsOptions');
-const connectDB = require('../config/dbConnect');
-const mongoose = require('mongoose');
+const {setupOttoman} = require('../config/dbConnect');
 
-console.log(process.env.NODE_ENV);
-connectDB();
+const main = async () => {
+
+await setupOttoman();
 
 app.use(cors(corsOptions));
 app.use(express.json()); // middleware to parse json
@@ -40,15 +40,11 @@ app.use('/api/articles', require('../routes/commentRoutes'));
 
 
 
-mongoose.connection.once('open', () => {
-    console.log('Connected to MongoDB');
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-    });
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
+};
 
-mongoose.connection.on('error', err => {
-    console.log(err);
-})
-
+main();
 module.exports = app;

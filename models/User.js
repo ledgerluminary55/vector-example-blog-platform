@@ -1,13 +1,22 @@
-const mongoose = require('mongoose');
-const uniqueValidator = require('mongoose-unique-validator');
+const { Schema, model, getModel,addValidators } = require('ottoman');
 const jwt = require("jsonwebtoken");
+const accessTokenSecret = require('../config/securityConfig');
+const { PropertyRequiredError, ValidationError} = require("../api/errors");
+const emailRegX = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,5})+$/;
+addValidators({
+    username: (value) => {
+        if(value &&  /\s/g.test(value)) {
+          throw new PropertyRequiredError("username");
+        }
+    },
+  });
 
-const userSchema = new mongoose.Schema({
+const userSchema = new Schema({
     username: {
         type: String,
         required: true,
         unique: true,
-        lowercase: true
+        validator: 'username'
     },
     password: {
         type: String,
@@ -16,9 +25,8 @@ const userSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        lowercase: true,
         unique: true,
-        match: [/\S+@\S+\.\S+/, 'is invalid'],
+        validator: { regexp: emailRegX, message: 'email invalid' } ,
         index: true
     },
     bio: {
@@ -27,34 +35,28 @@ const userSchema = new mongoose.Schema({
     },
     image: {
         type: String,
-        default: "https://static.productionready.io/images/smiley-cyrus.jpg"
+        default: ""
     },
-    favouriteArticles: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Article'
-    }],
-    followingUsers: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    }]
+    favouriteArticles: {default: ()=> [], type: [{type: String, ref: 'Article'}]},
+    followingUsers: {default: () => [], type:[{type: String, ref: 'User'}]}
 },
     {
         timestamps: true
     });
 
-userSchema.plugin(uniqueValidator);
+// userSchema.plugin(uniqueValidator);
 
 // @desc generate access token for a user
 // @required valid email and password
 userSchema.methods.generateAccessToken = function() {
     const accessToken = jwt.sign({
             "user": {
-                "id": this._id,
+                "id": this.id,
                 "email": this.email,
                 "password": this.password
             }
         },
-        process.env.ACCESS_TOKEN_SECRET,
+        accessTokenSecret,
         { expiresIn: "1d"}
     );
     return accessToken;
@@ -75,15 +77,17 @@ userSchema.methods.toProfileJSON = function (user) {
         username: this.username,
         bio: this.bio,
         image: this.image,
-        following: user ? user.isFollowing(this._id) : false
+        following: user ? user.isFollowing(this.id) : false
     }
 };
 
 userSchema.methods.isFollowing = function (id) {
     const idStr = id.toString();
-    for (const followingUser of this.followingUsers) {
-        if (followingUser.toString() === idStr) {
-            return true;
+    if (this.followingUsers) {
+        for (const followingUser of this.followingUsers) {
+            if (followingUser.toString() === idStr) {
+                return true;
+            }
         }
     }
     return false;
@@ -97,48 +101,52 @@ userSchema.methods.follow = function (id) {
 };
 
 userSchema.methods.unfollow = function (id) {
-    if(this.followingUsers.indexOf(id) !== -1){
-        this.followingUsers.remove(id);
+    const idx = this.followingUsers.indexOf(id);
+    if(idx !== -1){
+        this.followingUsers.splice(idx, 1);
     }
     return this.save();
 };
 
 userSchema.methods.isFavourite = function (id) {
     const idStr = id.toString();
-    for (const article of this.favouriteArticles) {
-        if (article.toString() === idStr) {
-            return true;
+    if (this.favouriteArticles) {
+        for (const article of this.favouriteArticles) {
+            if (article.toString() === idStr) {
+                return true;
+            }
         }
     }
     return false;
 }
 
-userSchema.methods.favorite = function (id) {
+userSchema.methods.favorite = async function (id) {
     if(this.favouriteArticles.indexOf(id) === -1){
         this.favouriteArticles.push(id);
     }
 
-    // const article = await Article.findById(id).exec();
-    //
-    // article.favouritesCount += 1;
-    //
-    // await article.save();
+    const article = await getModel('Article').findById(id);
 
-    return this.save();
+    article.favouritesCount += 1;
+    await this.save();
+
+    return article.save();
 }
 
-userSchema.methods.unfavorite = function (id) {
-    if(this.favouriteArticles.indexOf(id) !== -1){
-        this.favouriteArticles.remove(id);
+userSchema.methods.unfavorite = async  function (id) {
+    const idx = this.favouriteArticles.indexOf(id);
+    if(idx !== -1){
+        this.favouriteArticles.splice(idx, 1);
     }
 
-    // const article = await Article.findById(id).exec();
-    //
-    // article.favouritesCount -= 1;
-    //
-    // await article.save();
+    const article = await getModel('Article').findById(id);
+    article.favouritesCount -= 1;
+    await this.save();
 
-    return this.save();
+    return article.save();
 };
 
-module.exports = mongoose.model('User', userSchema);
+const scope = process.env.DB_SCOPE || "_default";
+const User =  model('User', userSchema, { scopeName: scope });
+exports.userSchema = userSchema;
+exports.User = User;

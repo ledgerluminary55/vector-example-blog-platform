@@ -1,19 +1,12 @@
-const mongoose = require('mongoose');
-const User = require("./User");
+const { Schema, model, getModel } = require('ottoman');
 
-const commentSchema = new mongoose.Schema({
+const commentSchema = new Schema({
     body: {
         type: String,
         required: true
     },
-    author: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    },
-    article: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Article'
-    }
+    author: {type: String, ref: 'User'},
+    article: {type: String, ref: 'Article'}
 },
     {
         timestamps: true
@@ -21,9 +14,9 @@ const commentSchema = new mongoose.Schema({
 
 
 commentSchema.methods.toCommentResponse = async function (user) {
-    const authorObj = await User.findById(this.author).exec();
+    let authorObj = await getModel('User').findById(this.author);
     return {
-        id: this._id,
+        id: this.id,
         body: this.body,
         createdAt: this.createdAt,
         updatedAt: this.updatedAt,
@@ -31,4 +24,5 @@ commentSchema.methods.toCommentResponse = async function (user) {
     }
 };
 
-module.exports = mongoose.model('Comment', commentSchema);
+const scope = process.env.DB_SCOPE || "_default";
+module.exports = { Comment: model('Comment', commentSchema, { scopeName: scope }), commentSchema: commentSchema};

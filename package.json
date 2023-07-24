@@ -1,12 +1,15 @@
 {
-  "name": "realworld-node-express-mongodb-javascript",
+  "name": "realworld-node-express-couchbase-javascript",
   "version": "1.0.0",
   "description": "realWorld Project",
   "main": "api/index.js",
   "scripts": {
-    "start": "node server",
+    "start": "node api/index.js",
     "dev": "nodemon server",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --verbose --forceExit --detectOpenHandles",
+    "start:coverage": "nyc --silent node api/index.js",
+    "lint": "eslint .",
+    "test-api": "postman/run-api-test.sh"
   },
   "keywords": [],
   "author": "",
@@ -15,15 +18,29 @@
     "bcrypt": "^5.1.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
+    "cross-env": "^7.0.3",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "express-async-handler": "^1.2.0",
     "jsonwebtoken": "^8.5.1",
-    "mongoose": "^6.8.1",
-    "mongoose-unique-validator": "^3.1.0",
-    "slugify": "^1.6.5"
+    "ottoman": "^2.3.3",
+    "roarr": "^7.15.0",
+    "slugify": "^1.6.5",
+    "supertest": "^6.3.3"
   },
   "devDependencies": {
+    "jest": "^29.6.0",
     "nodemon": "^2.0.20"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "./__tests__/jest.setup.js"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "dist/"
+    ],
+    "testTimeout": 10000
   }
 }

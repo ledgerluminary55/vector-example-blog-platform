@@ -1,9 +1,7 @@
-const mongoose = require('mongoose');
-const uniqueValidator = require('mongoose-unique-validator');
+const { Schema, model, getModel } = require('ottoman');
 const slugify = require('slugify');
-const User = require('./User');
 
-const articleSchema = new mongoose.Schema({
+const articleSchema = new Schema({
     slug: {
         type: String,
         unique: true,
@@ -22,71 +20,77 @@ const articleSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    tagList: [{
+    tagList: {default: () => [],type : [{
         type: String
-    }],
-    author: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    },
+    }]},
+    author: {type: String, ref : 'User'},
     favouritesCount: {
         type: Number,
         default: 0
     },
-    comments: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Comment'
-    }]
+    comments: {default: () => [], type:[{type: String, ref: 'Comment'}]}
+
 }, {
     timestamps: true
 });
 
-articleSchema.plugin(uniqueValidator);
+// TODO: Implement uniqueValidator
+// articleSchema.plugin(uniqueValidator);
 
-articleSchema.pre('save', function(next){
-    this.slug = slugify(this.title, { lower: true, replacement: '-'});
-    next();
+articleSchema.pre('update', function(document){
+    document.slug = slugify(document.title, { lower: true, replacement: '-'});
 });
 
-articleSchema.methods.updateFavoriteCount = async function () {
-    const favoriteCount = await User.count({
-        favouriteArticles: {$in: [this._id]}
-    });
+// articleSchema.methods.updateFavoriteCount = async function () {
 
-    this.favouritesCount = favoriteCount;
+//     const User = getModel('User');
 
-    return this.save();
-}
+//     const favoriteCount = await User.count({
+//         favouriteArticles: {$in: this.id}
+//     });
+//     console.log(favoriteCount);
+
+//     this.favouritesCount = favoriteCount;
+
+//     return this.save();
+// }
 
 // user is the logged-in user
 articleSchema.methods.toArticleResponse = async function (user) {
-    const authorObj = await User.findById(this.author).exec();
+    const User = getModel('User');
+    const authorObj = await User.findById(this.author);
     return {
         slug: this.slug,
+        articleSlug: this.slug,
         title: this.title,
         description: this.description,
         body: this.body,
         createdAt: this.createdAt,
         updatedAt: this.updatedAt,
         tagList: this.tagList,
-        favorited: user ? user.isFavourite(this._id) : false,
+        favorited: user ? user.isFavourite(this.id) : false,
         favoritesCount: this.favouritesCount,
         author:  authorObj.toProfileJSON(user)
     }
 }
 
-articleSchema.methods.addComment = function (commentId) {
+articleSchema.methods.addComment = async function (commentId) {
     if(this.comments.indexOf(commentId) === -1){
         this.comments.push(commentId);
     }
     return this.save();
 };
 
-articleSchema.methods.removeComment = function (commentId) {
-    if(this.comments.indexOf(commentId) !== -1){
-        this.comments.remove(commentId);
+articleSchema.methods.removeComment = async function (commentId) {
+    const idx = this.comments.indexOf(commentId);
+    if(idx!== -1){
+        this.comments.splice(idx, 1);
     }
+
     return this.save();
 };
 
-module.exports = mongoose.model('Article', articleSchema);
+const scope = process.env.DB_SCOPE || "_default";
+const article =  model('Article', articleSchema, { scopeName: scope });
+exports.articleSchema = articleSchema;
+exports.Article = article;

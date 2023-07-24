@@ -9,7 +9,7 @@
     "test": "jest --verbose --forceExit --detectOpenHandles",
     "start:coverage": "nyc --silent node api/index.js",
     "lint": "eslint .",
-    "test-api": "postman/run-api-test.sh"
+    "test-api": "postman/run-api-tests.sh"
   },
   "keywords": [],
   "author": "",

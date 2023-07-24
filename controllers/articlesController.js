@@ -43,7 +43,7 @@ const deleteArticle = asyncHandler(async (req, res) => {
 
     const { slug } = req.params;
 
-    // console.log(id);
+    log.debug(`userid: ${id}`);
 
     const loginUser = await User.findById(id).catch(e => log.debug(e, "User not found"));
 
@@ -60,8 +60,8 @@ const deleteArticle = asyncHandler(async (req, res) => {
             message: "Article Not Found"
         });
     }
-    // console.log(`article author is ${article.author}`)
-    // console.log(`login user id is ${loginUser}`)
+    log.debug(`article author is ${article.author}`)
+    log.debug(`login user id is ${loginUser}`)
 
     if (article.author.toString() === loginUser.id.toString()) {
         await Article.removeById(article.id);
@@ -96,7 +96,7 @@ const favoriteArticle = asyncHandler(async (req, res) => {
             message: "Article Not Found"
         });
     }
-    // console.log(`article info ${article}`);
+    log.debug(`article info ${article}`);
 
     const updatedArticle = await loginUser.favorite(article.id);
 
@@ -160,8 +160,8 @@ const updateArticle = asyncHandler(async (req, res) => {
 
     const target = await Article.findOne({ slug });
 
-    // console.log(target.title);
-    // console.log(req.userId);
+    log.debug(target.title);
+    log.debug(req.userId);
     if (article.title) {
         target.title = article.title;
     }
@@ -198,7 +198,7 @@ const feedArticles = asyncHandler(async (req, res) => {
 
     const loginUser = await User.findById(userId);
 
-    // console.log(loginUser.followingUsers)
+    log.debug(loginUser.followingUsers)
 
     // confirm data
 
@@ -207,7 +207,7 @@ const feedArticles = asyncHandler(async (req, res) => {
          skip: Number(offset)
     });
 
-    // console.log(`articles: ${filteredArticles}`);
+    log.debug(`articles: ${filteredArticles}`);
     const articleCount = await Article.count({author: {$in: loginUser.followingUsers}});
 
     const fetchedArticles = await Promise.all(filteredArticles.map(async article => {

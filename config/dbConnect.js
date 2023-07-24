@@ -2,12 +2,17 @@ const {model, registerGlobalPlugin, getDefaultInstance, Ottoman } = require('ott
 const {userSchema, User} = require('../models/User');
 const {articleSchema, Article} = require('../models/Article');
 const {commentSchema, Comment} = require('../models/Comment');
+const  {Logger} = require('../config/logger');
+const log = Logger.child({
+    namespace: 'DBConnect',
+});
 
 const setupOttoman = async function(){
 
+  // TODO: Fix global plugin registration
     await registerGlobalPlugin((schema) => {
         schema.pre('save', function (doc) {
-          console.log("SAAAAAVE");
+          log.info("SAAAAAVE");
         });
       });
 
@@ -39,7 +44,7 @@ const setupOttoman = async function(){
     const Article = model('Article', articleSchema, { scopeName: scope });
 
     await ottoman.start();
-    console.log('Connected to Couchbase');
+    log.info('Connected to Couchbase');
 }
 
 module.exports = {setupOttoman, User, Comment, Article}

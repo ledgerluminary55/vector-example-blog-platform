@@ -35,10 +35,10 @@ const registerUser = asyncHandler(async (req, res) => {
         "email": user.email
     };
     const createdUser = await User.create(userObject).catch(e => {
-        console.log(e.name)
-        console.log(e.message)
-        console.log(e.property)
-        console.log(e)
+        log.debug(e.name)
+        log.debug(e.message)
+        log.debug(e.property)
+        log.debug(e)
         if (e instanceof PropertyRequiredError) {
             const err = {
                 errors: {

@@ -107,8 +107,8 @@ const deleteComment = asyncHandler(async (req, res) => {
         })
     });
 
-    // console.log(`comment author id: ${comment.author}`);
-    // console.log(`commenter id: ${commenter.id}`)
+    log.debug(`comment author id: ${comment.author}`);
+    log.debug(`commenter id: ${commenter.id}`)
 
     if (comment.author.toString() === commenter.id.toString()) {
         await article.removeComment(comment.id);

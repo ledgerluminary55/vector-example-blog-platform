@@ -36,24 +36,9 @@ const articleSchema = new Schema({
 
 // TODO: Implement uniqueValidator
 // articleSchema.plugin(uniqueValidator);
-
 articleSchema.pre('update', function(document){
     document.slug = slugify(document.title, { lower: true, replacement: '-'});
 });
-
-// articleSchema.methods.updateFavoriteCount = async function () {
-
-//     const User = getModel('User');
-
-//     const favoriteCount = await User.count({
-//         favouriteArticles: {$in: this.id}
-//     });
-//     console.log(favoriteCount);
-
-//     this.favouritesCount = favoriteCount;
-
-//     return this.save();
-// }
 
 // user is the logged-in user
 articleSchema.methods.toArticleResponse = async function (user) {

@@ -7,6 +7,10 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const corsOptions = require('../config/corsOptions');
 const {setupOttoman} = require('../config/dbConnect');
+const  {Logger} = require('../config/logger');
+const log = Logger.child({
+    namespace: 'Index',
+});
 
 const main = async () => {
 
@@ -38,11 +42,8 @@ app.use('/api/tags', require('../routes/tagRoutes'));
 // comment routes
 app.use('/api/articles', require('../routes/commentRoutes'));
 
-
-
-
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    log.info(`Server running on port ${PORT}`);
 });
 };
 

@@ -52,10 +52,10 @@ jobs:
         curl  -u Administrator:password -v -X POST http://localhost:8091/settings/web -d 'password=password&username=Administrator&port=SAME'
          curl -v -X POST http://localhost:8091/pools/default/buckets \
           -u Administrator:password \
-          -d name=user_profile \
+          -d name=default \
           -d bucketType=couchbase\
-          -d ramQuotaMB=512 \
-          -d durabilityMinLevel=majorityAndPersistActive
+          -d ramQuotaMB=256 \
+          -d durabilityMinLevel=none
         curl  -u Administrator:password -v -X POST http://localhost:8091/settings/indexes -d 'storageMode=memory_optimized'
         curl  -u Administrator:password -v -X GET http://localhost:8091/pools/default | jq '.' | grep hostname
     - uses: actions/checkout@v2
